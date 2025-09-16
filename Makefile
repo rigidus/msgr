@@ -107,3 +107,9 @@ help:
 	@echo "  CC=<compiler>    (default: cc)"
 	@echo "  CSTD='-std=c11'  (or -std=gnu11)"
 	@echo "  BIN_DIR=bin SRC_DIR=src INC_DIR=include"
+
+.PHONY: test
+
+test: all
+	@echo "[RUN] smoke tests"
+	@sh tests/run_all.sh

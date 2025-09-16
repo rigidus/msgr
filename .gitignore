@@ -1,2 +1,5 @@
 ./bin/*
+./msgs/*
+./encrypted_msgs/*
+./keys/*
 *.o

@@ -70,6 +70,7 @@ make communicator
 #+END_SRC
 
 * Запуск
+
 Каждый бинарник запускается отдельным процессом и работает в бесконечном
 цикле, опрашивая каталоги раз в секунду.
 
@@ -89,6 +90,18 @@ make communicator
   # 4. Коммуникатор
   # выполняет отправку, и приём зашифрованных сообщений
   ./communicator
+#+END_SRC
+
+** Сгенерировать ключи для криптора
+Приватный ключ (PKCS#8 PEM)
+
+#+BEGIN_SRC sh
+openssl genrsa -out keys/me_private.pem 4096
+#+END_SRC
+
+Публичный ключ собеседника (для теста можно взять свою же пару)
+#+BEGIN_SRC sh
+openssl rsa -in keys/me_private.pem -pubout -out keys/peer_public.pem
 #+END_SRC
 
 * Шаблон цикла сообщений с таймаутом

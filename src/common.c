@@ -6,6 +6,8 @@
 #include <time.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <dirent.h>
+#include <limits.h>
 
 /* ---- ID и время ---- */
 void gen_id(char *out, size_t outlen) {
@@ -115,13 +117,60 @@ int insert_new(msg_type_t type, const char *sexpr_str) {
     return write_file_atomic(dir, filename, sexpr_str, strlen(sexpr_str));
 }
 
-char **get_all(msg_type_t type,
-               const char *dir_filter,
-               size_t *out_count)
+static int has_dir_suffix(const char *name, const char *dir_sfx) {
+    size_t nlen = strlen(name), slen = strlen(dir_sfx);
+    if (slen == 0) return 1;                 /* нет фильтра */
+    if (nlen < slen) return 0;
+    return (strcmp(name + (nlen - slen), dir_sfx) == 0);
+}
+
+/* Возвращает новые строки (malloc). Вызывает scandir, сортирует по имени (alphasort).
+ * dir_filter: "in", "out" или NULL (оба).
+ */
+char **get_all(msg_type_t type, const char *dir_filter, size_t *out_count)
 {
-    /* Заглушка: возвращает пустой список.
-       Реализация: scandir(), фильтр по "__in"/"__out" в имени файла,
-       сортировка по имени. */
-    *out_count = 0;
-    return NULL;
+    const char *dirpath = (type == MSG_PLAIN) ? "msgs" : "encrypted_msgs";
+    struct dirent **namelist = NULL;
+    int n = scandir(dirpath, &namelist, NULL, alphasort);
+    if (n < 0) { *out_count = 0; return NULL; }
+
+    const char *sfx = NULL;
+    char sfx_buf[8] = {0};
+    if (dir_filter && (strcmp(dir_filter, "in") == 0 || strcmp(dir_filter, "out") == 0)) {
+        snprintf(sfx_buf, sizeof(sfx_buf), "__%s", dir_filter);
+        sfx = sfx_buf;
+    }
+
+    char **out = NULL;
+    size_t cap = 0, cnt = 0;
+
+    for (int i = 0; i < n; i++) {
+        struct dirent *de = namelist[i];
+        if (de->d_name[0] == '.') { free(de); continue; }  /* . .. .tmp... */
+        if (sfx && !has_dir_suffix(de->d_name, sfx)) { free(de); continue; }
+
+        /* Полный путь */
+        char path[PATH_MAX];
+        snprintf(path, sizeof(path), "%s/%s", dirpath, de->d_name);
+
+        /* Читаем файл целиком */
+        size_t len = 0;
+        char *content = read_file_all(path, &len);
+        free(de);
+        if (!content) continue;
+
+        /* Расширяем массив результов при необходимости */
+        if (cnt == cap) {
+            size_t newcap = (cap == 0) ? 8 : (cap * 2);
+            char **tmp = realloc(out, newcap * sizeof(char*));
+            if (!tmp) { free(content); break; }
+            out = tmp; cap = newcap;
+        }
+
+        out[cnt++] = content;
+    }
+    free(namelist);
+
+    *out_count = cnt;
+    return out;
 }
