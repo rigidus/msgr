@@ -1,0 +1,90 @@
+#+TITLE: MSGR - Secure Messenger
+#+AUTHOR: Rigidus<i.am.rigidus@gmail.com
+
+* Введение
+
+Это минималистичный мессенджер, с шифрованием сообщений для сборки и работы на Linux и macOS.
+
+Он состоит из нескольких приложений, которые должны быть запущены вместе (например в chroot), так как они взаимодействуют друг с другом через файлы.
+
+Рассчитан на то чтобы быть максимально простым но при этом расширяемым.
+
+* Схема работы
+#+CAPTION: Архитектура мессенджера
+[[file:docs/img/components.png]]
+
+Сообщения проходят цепочку:
+
+#+BEGIN_EXAMPLE
+ui_in_msg → msgs/ → cryptor → encrypted_msgs/ → communicator → сеть
+сеть → communicator → encrypted_msgs/ → cryptor → msgs/ → ui_out_msg
+#+END_EXAMPLE
+
+* Состав проекта
+** Каталоги
+- =msgs/= :: «чистые» сообщения пользователя.
+- =encrypted_msgs/= :: зашифрованные сообщения, готовые к отправке или полученные из сети.
+- =keys/= ::
+  - =me_private.pem= — приватный ключ RSA-4096.
+  - =peer_public.pem= — публичный ключ собеседника.
+
+** Формат файлов
+*** Открытые сообщения (=msgs/=)
+#+BEGIN_SRC lisp
+(msg
+  :id "01J9H2..."
+  :prev-id "01J9H1..."
+  :time "2025-09-16T20:00:00.123Z"
+  :dir "in"|"out"
+  :data "Привет, мир")
+#+END_SRC
+Ограничение: плейнтекст ≤ 446 байт.
+
+*** Зашифрованные (=encrypted_msgs/=)
+#+BEGIN_SRC lisp
+(emsg
+  :id "01J9H2..."
+  :dir "in"|"out"
+  :cipher "BASE64_RSA_CIPHERTEXT")
+#+END_SRC
+=:cipher= всегда длиной 512 байт после base64-декодирования.
+
+** Бинарники
+- =ui_in_msg= :: ввод сообщений пользователем.
+- =ui_out_msg= :: вывод входящих сообщений.
+- =cryptor= :: шифрование/дешифрование между =msgs/= и =encrypted_msgs/=.
+- =communicator= :: передача зашифрованных сообщений в сеть (MVP: заглушка).
+
+* Сборка
+Требуется =gcc= или =clang=, поддержка POSIX API и OpenSSL (для =cryptor=).
+
+#+BEGIN_SRC sh
+# собрать все бинарники
+make
+
+# или по отдельности
+make ui_in_msg
+make ui_out_msg
+make cryptor
+make communicator
+#+END_SRC
+
+* Запуск
+Каждый бинарник запускается отдельным процессом и работает в бесконечном
+цикле, опрашивая каталоги раз в секунду.
+
+#+BEGIN_SRC sh
+# 1. Запуск ввода сообщений
+./ui_in_msg --db .
+
+# 2. Запуск вывода сообщений
+./ui_out_msg --db .
+
+# 3. Шифратор
+./cryptor --db . --mode encrypt
+./cryptor --db . --mode decrypt
+
+# 4. Коммуникатор
+./communicator --db . --mode send
+./communicator --db . --mode receive
+#+END_SRC
