@@ -82,7 +82,6 @@ make communicator
 
 # 3. Шифратор
 ./cryptor
-./cryptor
 
 # 4. Коммуникатор
 ./communicator
