@@ -11,7 +11,7 @@
 
 * Схема работы
 #+CAPTION: Архитектура мессенджера
-[[file:docs/img/components.png]]
+[[file:doc/img/components.png]]
 
 Сообщения проходят цепочку:
 
