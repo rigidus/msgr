@@ -75,16 +75,15 @@ make communicator
 
 #+BEGIN_SRC sh
 # 1. Запуск ввода сообщений
-./ui_in_msg --db .
+./ui_in_msg
 
 # 2. Запуск вывода сообщений
-./ui_out_msg --db .
+./ui_out_msg
 
 # 3. Шифратор
-./cryptor --db . --mode encrypt
-./cryptor --db . --mode decrypt
+./cryptor
+./cryptor
 
 # 4. Коммуникатор
-./communicator --db . --mode send
-./communicator --db . --mode receive
+./communicator
 #+END_SRC
