@@ -9,6 +9,21 @@
 #include <dirent.h>
 #include <limits.h>
 
+/* --- helpers to extract quoted field values like :id "..." --- */
+static int extract_quoted_field(const char *s, const char *key, char *out, size_t outlen) {
+    /* ищем :key "value" */
+    char pat[64];
+    snprintf(pat, sizeof pat, ":%s", key);
+    const char *p = strstr(s, pat);
+    if (!p) return 0;
+    p = strchr(p, '\"'); if (!p) return 0;
+    p++;
+    size_t i = 0;
+    while (*p && *p != '\"' && i + 1 < outlen) out[i++] = *p++;
+    out[i] = '\0';
+    return (*p == '\"'); /* успешно, если нашли закрывающую кавычку */
+}
+
 /* ---- ID и время ---- */
 void gen_id(char *out, size_t outlen) {
     /* Простая генерация: время+rand. TODO: заменить на ULID/UUIDv7 */
@@ -90,30 +105,29 @@ char *read_file_all(const char *path, size_t *out_len) {
 }
 
 /* ---- Основные API ---- */
+
 int insert_new(msg_type_t type, const char *sexpr_str) {
-    char time[TIME_MAX_LEN];
+    char time_iso[TIME_MAX_LEN];
     char id[ID_MAX_LEN];
-    char filename[256];
-    const char *dir;
-
-    gen_time(time, sizeof(time));
-    gen_id(id, sizeof(id));
-
-    /* Вытаскиваем :dir из sexpr (очень грубо: ищем ":dir") */
-    const char *dirpos = strstr(sexpr_str, ":dir");
-    const char *val = (dirpos ? strstr(dirpos, "\"") : NULL);
     char dirflag[8] = "out";
-    if (val) {
-        sscanf(val+1, "%7[^\"]", dirflag);
+    char filename[256];
+
+    /* dir: in|out */
+    (void)extract_quoted_field(sexpr_str, "dir", dirflag, sizeof dirflag);
+
+    /* id: если не нашли — сгенерим */
+    if (!extract_quoted_field(sexpr_str, "id", id, sizeof id)) {
+        gen_id(id, sizeof id);
     }
 
-    make_filename(filename, sizeof(filename), time, id, dirflag);
+    /* time: если нет — сгенерим */
+    if (!extract_quoted_field(sexpr_str, "time", time_iso, sizeof time_iso)) {
+        gen_time(time_iso, sizeof time_iso);
+    }
 
-    if (type == MSG_PLAIN)
-        dir = "msgs";
-    else
-        dir = "encrypted_msgs";
+    make_filename(filename, sizeof filename, time_iso, id, dirflag);
 
+    const char *dir = (type == MSG_PLAIN) ? "msgs" : "encrypted_msgs";
     return write_file_atomic(dir, filename, sexpr_str, strlen(sexpr_str));
 }
 
